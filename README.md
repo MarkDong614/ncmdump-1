@@ -10,7 +10,7 @@ Netease Cloud Music Copyright Protection File Dump
 	gson
 
 ## 使用
-- 使用前请先安装JRE（废话）
+- 程序已经打包好[(这里下载)](https://github.com/Yeamy/ncmdump/releases)，使用前请先安装JRE（废话）
 
 - 生成文件默认与源文件同目录，点击`输出目录`按钮即可修改，再次点击会恢复成与源文件同目录，输出目录在转换期间不能修改。
 
