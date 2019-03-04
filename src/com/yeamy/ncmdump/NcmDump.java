@@ -1,117 +1,110 @@
 package com.yeamy.ncmdump;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.util.Base64;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
+import javax.imageio.ImageIO;
+
+import org.jaudiotagger.audio.AudioFile;
+import org.jaudiotagger.audio.AudioFileIO;
+import org.jaudiotagger.audio.flac.metadatablock.MetadataBlockDataPicture;
+import org.jaudiotagger.tag.FieldKey;
+import org.jaudiotagger.tag.Tag;
+import org.jaudiotagger.tag.images.Artwork;
+import org.jaudiotagger.tag.images.ArtworkFactory;
 
 import com.google.gson.Gson;
-import com.mpatric.mp3agic.ID3v23Tag;
-import com.mpatric.mp3agic.InvalidDataException;
-import com.mpatric.mp3agic.Mp3File;
-import com.mpatric.mp3agic.NotSupportedException;
-import com.mpatric.mp3agic.UnsupportedTagException;
 
 public class NcmDump {
-	private static final byte[] aes_core_key = { 0x68, 0x7A, 0x48, 0x52, 0x41, 0x6D, 0x73, 0x6F, 0x35, 0x6B, 0x49, 0x6E,
+	private static final byte[] CORE_KEY = { 0x68, 0x7A, 0x48, 0x52, 0x41, 0x6D, 0x73, 0x6F, 0x35, 0x6B, 0x49, 0x6E,
 			0x62, 0x61, 0x78, 0x57 };
-	private static final byte[] aes_modify_key = { 0x23, 0x31, 0x34, 0x6C, 0x6A, 0x6B, 0x5F, 0x21, 0x5C, 0x5D, 0x26,
-			0x30, 0x55, 0x3C, 0x27, 0x28 };
+	private static final byte[] MODIFY_KEY = { 0x23, 0x31, 0x34, 0x6C, 0x6A, 0x6B, 0x5F, 0x21, 0x5C, 0x5D, 0x26, 0x30,
+			0x55, 0x3C, 0x27, 0x28 };
 
 	public static boolean dump(File file, File outPath) {
-		try {
-			Music music = NcmDump.dumpData(file, outPath);
-			if (music == null) {
-				return false;
-			} else if (music.isMP3()) {
-				setID3(music);
-			} else {
-				music.tmpFile().renameTo(music.file);
-			}
+		NcmFile ncm = new NcmFile(file, outPath);
+		if (dumpData(ncm)) {
+			fixID3(ncm);
 			return true;
+		}
+		return false;
+	}
+
+	public static void fixID3(NcmFile ncm) {
+		try {
+			AudioFile f = AudioFileIO.read(ncm.outFile());
+			Tag tag = f.getTag();
+			tag.setField(FieldKey.ALBUM, ncm.id3.album);
+			tag.setField(FieldKey.TITLE, ncm.id3.musicName);
+			tag.setField(FieldKey.ARTIST, ncm.id3.artist());
+			if (ncm.albumImage != null) {
+				BufferedImage image = ImageIO.read(new ByteArrayInputStream(ncm.albumImage));
+				MetadataBlockDataPicture coverArt = new MetadataBlockDataPicture(ncm.albumImage, 0, //
+						ncm.albumImageMimeType(), //
+						"", //
+						image.getWidth(), //
+						image.getHeight(), //
+						image.getColorModel().hasAlpha() ? 32 : 24, //
+						0);
+				Artwork artwork = ArtworkFactory.createArtworkFromMetadataBlockDataPicture(coverArt);
+				tag.setField(tag.createField(artwork));
+			}
+			AudioFileIO.write(f);
 		} catch (Exception e) {
 			e.printStackTrace();
-			return false;
 		}
 	}
 
-	public static void setID3(Music music)
-			throws UnsupportedTagException, InvalidDataException, IOException, NotSupportedException {
-		ID3v23Tag tag = new ID3v23Tag();
-		tag.setAlbum(music.album);
-		tag.setTitle(music.musicName);
-		tag.setArtist(music.artist());
-		tag.setAlbumImage(music.cover, "image/jpg");
-
-		File ftmp = music.tmpFile();
-		Mp3File mp3file = new Mp3File(ftmp);
-		tag.setEncoder(mp3file.getId3v2Tag().getEncoder());
-		mp3file.setId3v2Tag(tag);
-		mp3file.save(music.file.toString());
-
-		ftmp.delete();
-	}
-
-	private static Music dumpData(File file, File outPath) throws IOException {
+	private static boolean dumpData(NcmFile ncm) {
 		FileInputStream fncm = null;
-		FileOutputStream fmp3 = null;
+		FileOutputStream fout = null;
 		try {
-			fncm = new FileInputStream(file);
+			fncm = new FileInputStream(ncm.fncm);
 			byte[] b = new byte[1024];
 			fncm.read(b, 0, 8);
 			if (!"CTENFDAM".equals(new String(b, 0, 8))) {
-				return null;
+				return false;
 			}
-			fncm.read(b, 0, 2);
+			fncm.skip(2);
 			//
 			fncm.read(b, 0, 4);
-			int key_len = b2i(b);
-			byte[] key_data = new byte[key_len];
-			fncm.read(key_data);
-			for (int i = 0; i < key_data.length; i++) {
-				key_data[i] ^= 0x64;
+			int len = b2i(b);
+			if (len <= 0) {
+				return false;// broken file
+			}
+			byte[] keyData = new byte[len];
+			fncm.read(keyData);
+			for (int i = 0; i < keyData.length; i++) {
+				keyData[i] ^= 0x64;
 			}
 			// ID3 -------------------------------------------
 			fncm.read(b, 0, 4);
-			int ulen = b2i(b);
-
-			byte[] modifyData = new byte[ulen];
-			fncm.read(modifyData);
-			for (int i = 0; i < modifyData.length; i++) {
-				modifyData[i] ^= 0x63;
-			}
-			// offset header
-			byte[] tmp = new byte[modifyData.length - 22];
-			System.arraycopy(modifyData, 22, tmp, 0, tmp.length);
-			byte[] data = Base64.getDecoder().decode(tmp);
-			byte[] dedata = aes128_ecb_decrypt(data, aes_modify_key);
-			String json = new String(dedata, 6, dedata.length - 6).trim();
-			Music music = new Gson().fromJson(json, Music.class);
-			// read crc32 check
-			// fncm.read(b, 0, 4);
-			// ulen = b2i(b);
-			// fncm.read(b, 0, 5);
+			ID3Data id3 = readID3(fncm, b2i(b));
+			ncm.setID3(id3);
+			// skip crc32(4b) & unused chars(5b) ------------------
 			fncm.skip(9);
-			// cover -------------------------------------------
+			// albumImage -------------------------------------------
 			fncm.read(b, 0, 4);
-			int img_len = b2i(b);
-			if (img_len > 0) {
-				byte[] img_data = new byte[img_len];
+			int imgSize = b2i(b);
+			if (imgSize > 0) {
+				byte[] img_data = new byte[imgSize];
 				fncm.read(img_data);
-				music.cover = img_data;
+				ncm.setAlbumImage(img_data);
 			}
 			// mp3 data -------------------------------------------
-			byte[] de_key_data = aes128_ecb_decrypt(key_data, aes_core_key);
-			int[] box = build_key_box(de_key_data);
+			byte[] rawKeyData = aes128EcbDecrypt(keyData, CORE_KEY);
+			int[] box = buildKeyBox(rawKeyData);
 //			print(box);
 			byte[] buffer = new byte[0x4000];
-			String fname = file.getName().replace(".ncm", "." + music.format);
-			music.file = new File(outPath, fname);
-			fmp3 = new FileOutputStream(music.tmpFile());
+			File ftmp = ncm.tmpFile();
+			fout = new FileOutputStream(ftmp);
+			boolean first = true;
 			while (true) {
 				int n = fncm.read(buffer);
 				if (n < 0) {
@@ -124,21 +117,69 @@ public class NcmDump {
 					byte key = (byte) (box[k] & 0xff);
 					buffer[i] ^= key;
 				}
-				fmp3.write(buffer, 0, n);
+				if (first) {
+					ncm.setFormat(getFormat(ncm, buffer));
+					first = false;
+				}
+				fout.write(buffer, 0, n);
 			}
-			fmp3.flush();
-			return music;
+			fout.flush();
+			fout.close();
+			fout = null;
+			fncm.close();
+			fncm = null;
+			return ftmp.renameTo(ncm.outFile());
 		} catch (Exception e) {
 			e.printStackTrace();
-			return null;
+			return false;
 		} finally {
 			if (fncm != null) {
-				fncm.close();
+				try {
+					fncm.close();
+				} catch (Exception e2) {
+				}
 			}
-			if (fmp3 != null) {
-				fmp3.close();
+			if (fout != null) {
+				try {
+					fout.close();
+				} catch (Exception e2) {
+				}
 			}
 		}
+	}
+
+	private static ID3Data readID3(FileInputStream fncm, int n) {
+		if (n > 0) {
+			try {
+				byte[] modifyData = new byte[n];
+				fncm.read(modifyData);
+				for (int i = 0; i < modifyData.length; i++) {
+					modifyData[i] ^= 0x63;
+				}
+				// offset header
+				byte[] tmp = new byte[modifyData.length - 22];
+				System.arraycopy(modifyData, 22, tmp, 0, tmp.length);
+				// escape `163 key(Don't modify):`
+				byte[] data = Base64.getDecoder().decode(tmp);
+				byte[] dedata = aes128EcbDecrypt(data, MODIFY_KEY);
+				// escape `music:`
+				String json = new String(dedata, 6, dedata.length - 6).trim();
+				return new Gson().fromJson(json, ID3Data.class);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		return null;
+	}
+
+	private static String getFormat(NcmFile ncm, byte[] b) {
+		if (b[0] == 0x49 && b[1] == 0x44 && b[2] == 0x33) {
+			return "mp3";
+		}
+		return "flac";
+//		if (b[0] == 0x66 && b[1] == 0x4c && b[2] == 0x61) {
+//			return "flac";
+//		}
 	}
 
 	private static int b2i(byte[] b) {
@@ -150,7 +191,7 @@ public class NcmDump {
 		return i;
 	}
 
-	public static byte[] aes128_ecb_decrypt(byte[] src, byte[] key) throws Exception {
+	public static byte[] aes128EcbDecrypt(byte[] src, byte[] key) throws Exception {
 		int l = src.length;
 		int x = l % 16;
 		byte[] content = src;
@@ -164,7 +205,7 @@ public class NcmDump {
 		return cipher.doFinal(content);// 执行操作
 	}
 
-	private static int[] build_key_box(byte[] key) {
+	private static int[] buildKeyBox(byte[] key) {
 		int key_len = key.length - 17 - key[key.length - 1];
 		byte[] tmp = new byte[key.length - 17];
 		System.arraycopy(key, 17, tmp, 0, tmp.length);
