@@ -9,6 +9,11 @@ Netease Cloud Music Copyright Protection File Dump
 	jaudiotagger
 	gson
 
+## 代码
+界面相关类：MainUI, TaskBean TaskStatus
+核心类: NcmDump, NcmFile, ID3Data
+直接调用`NcmDump.dump(ncmFile, mp3File)`执行破解
+
 ## 使用
 - 程序已经打包好[(这里下载)](https://github.com/Yeamy/ncmdump/releases)，使用前请先安装JRE（废话）
 

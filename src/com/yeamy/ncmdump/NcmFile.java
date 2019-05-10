@@ -2,6 +2,11 @@ package com.yeamy.ncmdump;
 
 import java.io.File;
 
+/**
+ * file info for dump
+ * 
+ * @author Yeamy0754
+ */
 public class NcmFile {
 	public final File fncm;
 	private final File outPath;

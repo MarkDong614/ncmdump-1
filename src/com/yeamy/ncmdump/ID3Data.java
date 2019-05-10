@@ -1,5 +1,10 @@
 package com.yeamy.ncmdump;
 
+/**
+ * file id3 info for dump
+ * 
+ * @author Yeamy0754
+ */
 public class ID3Data {
 //	"musicId":39224884,
 //	"musicName":"Cheap Thrills",

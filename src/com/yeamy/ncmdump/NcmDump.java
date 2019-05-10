@@ -21,12 +21,23 @@ import org.jaudiotagger.tag.images.ArtworkFactory;
 
 import com.google.gson.Gson;
 
+/**
+ * core code of dump
+ * 
+ * @author Yeamy0754
+ */
 public class NcmDump {
 	private static final byte[] CORE_KEY = { 0x68, 0x7A, 0x48, 0x52, 0x41, 0x6D, 0x73, 0x6F, 0x35, 0x6B, 0x49, 0x6E,
 			0x62, 0x61, 0x78, 0x57 };
 	private static final byte[] MODIFY_KEY = { 0x23, 0x31, 0x34, 0x6C, 0x6A, 0x6B, 0x5F, 0x21, 0x5C, 0x5D, 0x26, 0x30,
 			0x55, 0x3C, 0x27, 0x28 };
 
+	/**
+	 * dump ncm file to mp3
+	 * @param file input file (*.ncm)
+	 * @param outPath output file (*.mp3)
+	 * @return true = success or false = fail
+	 */
 	public static boolean dump(File file, File outPath) {
 		NcmFile ncm = new NcmFile(file, outPath);
 		if (dumpData(ncm)) {
@@ -191,7 +202,7 @@ public class NcmDump {
 		return i;
 	}
 
-	public static byte[] aes128EcbDecrypt(byte[] src, byte[] key) throws Exception {
+	private static byte[] aes128EcbDecrypt(byte[] src, byte[] key) throws Exception {
 		int l = src.length;
 		int x = l % 16;
 		byte[] content = src;

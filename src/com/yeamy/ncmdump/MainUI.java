@@ -20,6 +20,11 @@ import javafx.scene.layout.GridPane;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 
+/**
+ * launcher / application
+ * 
+ * @author Yeamy0754
+ */
 public class MainUI extends Application {
 	private ThreadPoolExecutor pool = new ThreadPoolExecutor(1, 2, 0, TimeUnit.SECONDS, //
 			new LinkedBlockingDeque<>());

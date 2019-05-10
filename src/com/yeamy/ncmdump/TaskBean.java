@@ -2,6 +2,11 @@ package com.yeamy.ncmdump;
 
 import java.io.File;
 
+/**
+ * task info for application
+ * 
+ * @author Yeamy0754
+ */
 public class TaskBean {
 
 	public File file;
