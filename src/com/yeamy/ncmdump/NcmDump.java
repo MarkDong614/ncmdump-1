@@ -34,8 +34,9 @@ public class NcmDump {
 
 	/**
 	 * dump ncm file to mp3
-	 * @param file input file (*.ncm)
-	 * @param outPath output file (*.mp3)
+	 * 
+	 * @param file    input file (*.ncm)
+	 * @param outPath output path (folder/directory)
 	 * @return true = success or false = fail
 	 */
 	public static boolean dump(File file, File outPath) {
