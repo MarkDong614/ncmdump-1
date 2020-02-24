@@ -242,13 +242,4 @@ public class NcmDump {
 		}
 		return box;
 	}
-
-//	private static void print(byte[] bts) {
-//		StringBuilder sb = new StringBuilder();
-//		for (byte c : bts) {
-//			sb.append("0x").append(Integer.toHexString(c & 0xff)).append(", ");
-//		}
-//		System.out.println(sb.toString());
-//	}
-
 }
